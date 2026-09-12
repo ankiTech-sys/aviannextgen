@@ -16,62 +16,100 @@ jobs:
         with:
           persist-credentials: true
 
-      - name: Install PHP dependencies
+      - name: Show Docker versions
         run: |
-          composer install --no-interaction --prefer-dist
+          docker --version
+          docker compose version
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install frontend dependencies
-        run: |
-          npm install
-
-      - name: Build frontend
-        run: |
-          npm run build
-
-      - name: Configure application
+      - name: Prepare Laravel environment
         run: |
           cp .env.example .env
-          php artisan key:generate
 
-      - name: Configure SQLite database for testing
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
+          sed -i 's/^DB_HOST=.*/DB_HOST=database/' .env
+          sed -i 's/^DB_PORT=.*/DB_PORT=3306/' .env
+          sed -i 's/^DB_DATABASE=.*/DB_DATABASE=aviannextgen/' .env
+          sed -i 's/^DB_USERNAME=.*/DB_USERNAME=aviannextgen/' .env
+          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=aviannextgen_password/' .env
+
+      - name: Start MariaDB
         run: |
-          touch database/database.sqlite
+          docker compose up -d database
 
-          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
-
-          sed -i '/^DB_HOST=/d' .env
-          sed -i '/^DB_PORT=/d' .env
-          sed -i '/^DB_DATABASE=/d' .env
-          sed -i '/^DB_USERNAME=/d' .env
-          sed -i '/^DB_PASSWORD=/d' .env
-
-          echo "DB_DATABASE=/home/runner/work/aviannextgen/aviannextgen/database/database.sqlite" >> .env
-
-      - name: Run migrations
+      - name: Wait for MariaDB
         run: |
-          php artisan migrate --force
+          echo "Waiting for MariaDB..."
 
-      - name: Verify Laravel
+          for i in {1..30}; do
+            if docker compose exec -T database \
+              healthcheck.sh \
+              --connect \
+              --innodb_initialized; then
+              echo "MariaDB is ready."
+              exit 0
+            fi
+
+            echo "MariaDB is not ready yet..."
+            sleep 3
+          done
+
+          echo "MariaDB failed to become ready."
+          docker compose logs database
+          exit 1
+
+      - name: Install Composer dependencies
         run: |
-          php artisan --version
-          php artisan route:list
+          docker compose run --rm app composer install \
+            --no-interaction \
+            --prefer-dist
 
-      - name: Commit panel setup
+      - name: Generate Laravel application key
+        run: |
+          docker compose run --rm app php artisan key:generate
+
+      - name: Run Laravel migrations
+        run: |
+          docker compose run --rm app php artisan migrate --force
+
+      - name: Verify database connection
+        run: |
+          docker compose run --rm app php artisan tinker --execute="
+          DB::connection()->getPdo();
+          echo 'REAL MYSQL/MARIADB CONNECTION SUCCESSFUL';
+          "
+
+      - name: Show database status
+        run: |
+          docker compose exec -T database \
+            mariadb \
+            -uaviannextgen \
+            -paviannextgen_password \
+            -e "SELECT VERSION();"
+
+      - name: Show Laravel status
+        run: |
+          docker compose run --rm app php artisan --version
+
+      - name: Show running containers
+        run: |
+          docker compose ps
+
+      - name: Stop Docker services
+        if: always()
+        run: |
+          docker compose down -v
+
+      - name: Commit environment changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add .
+          git add .env.example
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Setup Aviannextgen panel foundation"
+            git commit -m "Configure Aviannextgen real MariaDB connection"
             git push origin HEAD:main
           fi
 
