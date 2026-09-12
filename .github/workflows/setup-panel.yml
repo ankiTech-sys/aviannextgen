@@ -1,0 +1,77 @@
+name: Setup Aviannextgen Panel
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  setup-panel:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Install PHP dependencies
+        run: |
+          composer install --no-interaction --prefer-dist
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install frontend dependencies
+        run: |
+          npm install
+
+      - name: Build frontend
+        run: |
+          npm run build
+
+      - name: Configure application
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Configure SQLite database for testing
+        run: |
+          touch database/database.sqlite
+
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
+
+          sed -i '/^DB_HOST=/d' .env
+          sed -i '/^DB_PORT=/d' .env
+          sed -i '/^DB_DATABASE=/d' .env
+          sed -i '/^DB_USERNAME=/d' .env
+          sed -i '/^DB_PASSWORD=/d' .env
+
+          echo "DB_DATABASE=/home/runner/work/aviannextgen/aviannextgen/database/database.sqlite" >> .env
+
+      - name: Run migrations
+        run: |
+          php artisan migrate --force
+
+      - name: Verify Laravel
+        run: |
+          php artisan --version
+          php artisan route:list
+
+      - name: Commit panel setup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Setup Aviannextgen panel foundation"
+            git push origin HEAD:main
+          fi
+
