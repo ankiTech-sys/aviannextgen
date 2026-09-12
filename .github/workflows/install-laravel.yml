@@ -3,6 +3,9 @@ name: Install Aviannextgen Laravel
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   install-laravel:
     runs-on: ubuntu-latest
@@ -10,6 +13,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - name: Install PHP
         run: |
@@ -71,6 +76,6 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "Install Laravel application"
-            git push
+            git push origin HEAD:main
           fi
 
