@@ -1,0 +1,95 @@
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: aviannextgen-app
+
+    restart: unless-stopped
+
+    working_dir: /var/www/html
+
+    volumes:
+      - ./:/var/www/html
+
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+
+      DB_CONNECTION: mysql
+      DB_HOST: database
+      DB_PORT: 3306
+      DB_DATABASE: aviannextgen
+      DB_USERNAME: aviannextgen
+      DB_PASSWORD: aviannextgen_password
+
+    depends_on:
+      database:
+        condition: service_healthy
+
+    networks:
+      - aviannextgen
+
+
+  nginx:
+    image: nginx:alpine
+
+    container_name: aviannextgen-nginx
+
+    restart: unless-stopped
+
+    ports:
+      - "8080:80"
+
+    volumes:
+      - ./:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+    depends_on:
+      - app
+
+    networks:
+      - aviannextgen
+
+
+  database:
+    image: mariadb:11
+
+    container_name: aviannextgen-database
+
+    restart: unless-stopped
+
+    environment:
+      MARIADB_DATABASE: aviannextgen
+      MARIADB_USER: aviannextgen
+      MARIADB_PASSWORD: aviannextgen_password
+      MARIADB_ROOT_PASSWORD: aviannextgen_root_password
+
+    volumes:
+      - aviannextgen_database:/var/lib/mysql
+
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - --connect
+        - --innodb_initialized
+
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - aviannextgen
+
+
+networks:
+  aviannextgen:
+    driver: bridge
+
+
+volumes:
+  aviannextgen_database:
+
