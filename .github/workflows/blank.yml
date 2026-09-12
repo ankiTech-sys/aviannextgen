@@ -1,0 +1,88 @@
+name: Aviannextgen Ubuntu Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  ubuntu-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Aviannextgen
+        uses: actions/checkout@v4
+
+      - name: Show Ubuntu Information
+        run: |
+          echo "========================================="
+          echo " AVIAN NEXTGEN - Ubuntu Environment"
+          echo "========================================="
+          echo ""
+          echo "Ubuntu:"
+          lsb_release -a
+          echo ""
+          echo "Kernel:"
+          uname -a
+          echo ""
+          echo "User:"
+          whoami
+          echo ""
+          echo "Working Directory:"
+          pwd
+          echo ""
+          echo "Repository Files:"
+          ls -la
+
+      - name: Update Linux Packages
+        run: |
+          sudo apt-get update
+
+      - name: Install Basic Server Packages
+        run: |
+          sudo apt-get install -y \
+            curl \
+            wget \
+            git \
+            unzip \
+            zip \
+            nginx \
+            mariadb-server \
+            software-properties-common
+
+      - name: Verify Server Software
+        run: |
+          echo "========================================="
+          echo " NGINX"
+          echo "========================================="
+          nginx -v
+
+          echo ""
+          echo "========================================="
+          echo " PHP"
+          echo "========================================="
+          php -v || true
+
+          echo ""
+          echo "========================================="
+          echo " MariaDB"
+          echo "========================================="
+          mysql --version
+
+          echo ""
+          echo "========================================="
+          echo " Git"
+          echo "========================================="
+          git --version
+
+      - name: Test Nginx Configuration
+        run: |
+          sudo nginx -t
+
+      - name: Final Status
+        run: |
+          echo ""
+          echo "========================================="
+          echo " AVIAN NEXTGEN UBUNTU TEST PASSED"
+          echo "========================================="
