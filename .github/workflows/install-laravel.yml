@@ -1,0 +1,76 @@
+name: Install Aviannextgen Laravel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  install-laravel:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PHP
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            php-cli \
+            php-mbstring \
+            php-xml \
+            php-curl \
+            php-zip \
+            php-bcmath \
+            php-intl \
+            php-gd \
+            unzip
+
+      - name: Install Composer
+        run: |
+          php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+          php composer-setup.php --install-dir=/tmp --filename=composer
+          sudo mv /tmp/composer /usr/local/bin/composer
+          composer --version
+
+      - name: Create Laravel application
+        run: |
+          composer create-project laravel/laravel aviannextgen-laravel "^12.0"
+
+      - name: Copy Laravel application
+        run: |
+          cp -a aviannextgen-laravel/. .
+          rm -rf aviannextgen-laravel
+
+      - name: Configure environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Configure database
+        run: |
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
+          sed -i 's/^DB_HOST=.*/DB_HOST=database/' .env
+          sed -i 's/^DB_PORT=.*/DB_PORT=3306/' .env
+          sed -i 's/^DB_DATABASE=.*/DB_DATABASE=aviannextgen/' .env
+          sed -i 's/^DB_USERNAME=.*/DB_USERNAME=aviannextgen/' .env
+          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=aviannextgen_password/' .env
+
+      - name: Verify Laravel
+        run: |
+          php artisan --version
+          php artisan about
+
+      - name: Commit Laravel application
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Install Laravel application"
+            git push
+          fi
+
